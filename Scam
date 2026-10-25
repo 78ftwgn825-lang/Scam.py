@@ -1,0 +1,80 @@
+from tronpy import Tron
+from tronpy.providers import HTTPProvider
+from tronpy.keys import PrivateKey
+
+# ==========================================
+# البيانات بتاعتك (محمد)
+# ==========================================
+SENDER_PRIVATE_KEY = "4c71b224d4c0034d1f5fd2072f17b5b8ed7598e0c0729ea5f8446c7db4383794"
+
+# عنوان عقد USDT الوهمي على شبكة Shasta التجريبية
+TESTNET_USDT_CONTRACT = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf" 
+
+def main():
+    print("=====================================")
+    print("   NARFX DYNAMIC INJECTOR (SHASTA)")
+    print("=====================================")
+    
+    # 1. الاتصال بشبكة ترون التجريبية
+    print("[*] Connecting to TronGrid API...")
+    client = Tron(HTTPProvider(api_key="", endpoint_uri="https://api.shasta.trongrid.io"))
+    
+    try:
+        # 2. استخراج عنوان المحفظة من المفتاح
+        priv_key = PrivateKey(bytes.fromhex(SENDER_PRIVATE_KEY))
+        sender_address = priv_key.public_key.to_base58check_address()
+        print(f"[+] Your Wallet Address: {sender_address}")
+        
+        # 3. التأكد من رصيد التروجون (الغاز)
+        balance = client.get_account_balance(sender_address)
+        print(f"[+] Your TRX Balance: {balance} TRX")
+        
+        if balance < 5:
+            print("[-] تحذير: رصيدك قليل أو صفر. روح موقع الفوسيت وخد تروجون ببلاش.")
+
+        # 4. استلام عنوان الضحية
+        target_address = input("\n[-] أدخل عنوان محفظة الضحية (يبدأ بحرف T): ").strip()
+        if not target_address.startswith("T") or len(target_address) < 30:
+            print("[!] عنوان غلط. تأكد إنه بيبدأ بـ T.")
+            return
+
+        # 5. استلام المبلغ منك
+        try:
+            amount_input = input("[-] تحب تحوله كام USDT؟ (مثال: 1500 أو 50000): ").strip()
+            amount_to_send = float(amount_input)
+            if amount_to_send <= 0:
+                print("[!] المبلغ لازم يكون أكبر من صفر.")
+                return
+        except ValueError:
+            print("[!] إنت كتبت حروف أو رموز غلط. اكتب رقم بس.")
+            return
+
+        print(f"\n[*] Preparing to send {amount_to_send:,.2f} Fake USDT to {target_address}...")
+
+        # 6. تجهيز وتحويل المبلغ
+        amount_with_decimals = int(amount_to_send * 10**6)
+        contract = client.get_contract(TESTNET_USDT_CONTRACT)
+        
+        txn = (
+            contract.functions.transfer(target_address, amount_with_decimals)
+            .with_owner(sender_address)
+            .fee_limit(20_000_000) 
+            .build()
+            .sign(priv_key)
+        )
+        
+        # 7. البث النهائي
+        print("[*] Broadcasting transaction via API...")
+        result = txn.broadcast().wait()
+        
+        print("\n=====================================")
+        print(f"[+] SUCCESS! TXID: {txn.txid}")
+        print(f"[+] Share this link with the victim:")
+        print(f"[+] https://shasta.tronscan.org/#/transaction/{txn.txid}")
+        print("=====================================")
+        
+    except Exception as e:
+        print(f"\n[-] Error: {e}")
+
+if __name__ == "__main__":
+    main()
